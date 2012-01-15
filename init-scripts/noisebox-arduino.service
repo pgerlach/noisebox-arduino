@@ -1,0 +1,11 @@
+[Unit]
+Description=Noisebox arduino
+After=sys-devices-platform-omap-ti81xx\x2dusbss-musb\x2dhdrc.1-usb1-1\x2d1-1\x2d1.4-1\x2d1.4:1.0-tty-ttyACM0.device
+
+[Service]
+WorkingDirectory=/home/root/noisebox/noisebox-arduino
+ExecStart=/usr/bin/python arduino_read.py
+
+[Install]
+WantedBy=multi-user.target
+
