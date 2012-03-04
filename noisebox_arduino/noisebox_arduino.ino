@@ -1,23 +1,40 @@
+#include <SoftwareSerial.h>
 
-const int debounceDelay = 10;
+SoftwareSerial rfidSerial(2, 3);
 
-const int nbButtons = 5;
 
+// buttons
 struct {
   int pin;
   const char* txt;
   int previousState;
-} tab[nbButtons] = {
-  { 2, "prev", LOW },
-  { 3, "playpause", LOW },
-  { 4, "next", LOW },
-  { 5, "vminus", LOW },
-  { 6, "vplus", LOW },
+} buttons[] = {
+  { 4, "prev", HIGH },
+  { 5, "playpause", HIGH },
+  { 6, "next", HIGH },
+  { 7, "vminus", HIGH },
+  { 8, "vplus", HIGH },
+  { 0, NULL, HIGH }
+};
+int buttonState = 0;
+const int debounceDelay = 10;
+
+// leds
+const struct {
+  char letter;
+  char pin;
+  char val;
+} leds[] = {
+  { 'a', 9, HIGH },
+  { 'b', 9, LOW },
+  { 'c', 10, HIGH },
+  { 'd', 10, LOW },
+  { 'e', 11, HIGH },
+  { 'f', 11, LOW },  
+  { 0, 0, 0 }
 };
 
-// buttons
-int buttonState = 0;
-int i;
+
 
 // rfid
 int  val = 0; 
@@ -27,62 +44,80 @@ int bytesread = 0;
 
 
 void setup() {
-  for (i=0; i<nbButtons; ++i) {
-    pinMode(tab[i].pin, INPUT);
+  for (int i=0; buttons[i].pin ; ++i) {
+    int pin = buttons[i].pin;
+    pinMode(pin, INPUT);
+    digitalWrite(pin, HIGH); // enable pullup resistor
+  }
+  for (int i=0; leds[i].pin; ++i) {
+    int pin = leds[i].pin;
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, HIGH);
   }
   Serial.begin(9600);
+  rfidSerial.begin(9600);
 }
 
 
 int debounce(int pin) {
-    boolean state;
-    boolean previousState;
-   
-   previousState = digitalRead(pin);
-   for (int counter = 0; counter < debounceDelay; counter++) {
-       delay(1);
-       state = digitalRead(pin);
-       if (state != previousState) {
-         counter = 0;
-         previousState = state;
-       }
-   }
+  boolean state;
+  boolean previousState;
+
+  previousState = digitalRead(pin);
+  for (int counter = 0; counter < debounceDelay; counter++) {
+    delay(1);
+    state = digitalRead(pin);
+    if (state != previousState) {
+      counter = 0;
+      previousState = state;
+    }
+  }
   return state;
 }
 
 void loop(){
-  
+
   // buttons
-  int i;
-  for (i=0; i<nbButtons; ++i) {
-    buttonState = debounce(tab[i].pin);
-    if (buttonState == HIGH && buttonState != tab[i].previousState) {
-        Serial.println(tab[i].txt);
+  for (int i=0; buttons[i].pin ; ++i) {
+    buttonState = debounce(buttons[i].pin);
+    if (buttonState == LOW && buttonState != buttons[i].previousState) {
+        Serial.println(buttons[i].txt);
     }
-    tab[i].previousState = buttonState;
+    buttons[i].previousState = buttonState;
+  }
+  
+  // commands (leds) via serial
+  while (Serial.available() > 0) {
+    char c = Serial.read();
+    for (int i=0; leds[i].letter ; ++i) {
+      if (leds[i].letter == c) {
+        digitalWrite(leds[i].pin, leds[i].val);
+        break ;
+      }
+    }
   }
   
   // rfid ( datasheet at http://www.seeedstudio.com/wiki/index.php?title=Electronic_brick_-_125Khz_RFID_Card_Reader)
-  if (Serial.available() > 0)
+  if (rfidSerial.available() > 0)
   {
-    if((val = Serial.read()) == 0x02) {
+    if((val = rfidSerial.read()) == 0x02) {
       bytesread = 0; 
       while(bytesread<10) {              // read 10 digit code 
-        if( Serial.available() > 0) { 
-          code[bytesread++] = Serial.read();         // add the digit           
+        if( rfidSerial.available() > 0) { 
+          code[bytesread++] = rfidSerial.read();         // add the digit           
         }
       }
       bytesread = 0;
       while (bytesread < 2) {
-        if (Serial.available() > 0) {
-          csum[bytesread++] = Serial.read();
+        if (rfidSerial.available() > 0) {
+          csum[bytesread++] = rfidSerial.read();
         }
         // TODO check the checksum
       }
       bytesread = 0;
       while (bytesread < 1) {
-        if (Serial.available() > 0) {
-          val = Serial.read();
+        if (rfidSerial.available() > 0) {
+          val = rfidSerial.read();
           bytesread++;
           if (val == 0x03) {
             Serial.print("rfid "); Serial.println(code);
